@@ -1,0 +1,15 @@
+# Copyright 2023 syzkaller project authors. All rights reserved.
+# Use of this source code is governed by Apache 2 LICENSE that can be found in the LICENSE file.
+
+config:
+ - CXL_BUS: [v5.12]
+ - CXL_PCI
+ - CXL_ACPI
+ - CXL_PMEM: [v5.14]
+ - CXL_MEM
+ - CXL_PORT: [v5.18]
+ - CXL_SUSPEND: [v5.19]
+ - CXL_REGION: [v6.0]
+ - DEV_DAX_CXL
+ - CXL_MEM_RAW_COMMANDS
+ - CXL_REGION_INVALIDATION_TEST: n

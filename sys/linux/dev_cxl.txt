@@ -1,0 +1,95 @@
+# Copyright 2023 syzkaller project authors. All rights reserved.
+# Use of this source code is governed by Apache 2 LICENSE that can be found in the LICENSE file.
+
+include <linux/ioctl.h>
+include <uapi/linux/cxl_mem.h>
+
+resource fd_cxlmem[fd]
+
+syz_open_dev$cxlmem(dev ptr[in, string["/dev/cxl/mem#"]], id intptr, flags flags[open_flags]) fd_cxlmem
+
+ioctl$CXL_MEM_QUERY_COMMANDS(fd fd_cxlmem, cmd const[CXL_MEM_QUERY_COMMANDS], arg ptr[inout, cxl_mem_query_commands])
+ioctl$CXL_MEM_SEND_COMMAND(fd fd_cxlmem, cmd const[CXL_MEM_SEND_COMMAND], arg ptr[inout, cxl_send_command])
+
+cxl_mem_query_commands {
+	n_commands	int32[0:CXL_MEM_COMMAND_ID_MAX] (inout)
+	rsvd		const[0, int32]
+	commands	array[cxl_command_info] (out)
+}
+
+cxl_command_info {
+	id		flags[cxl_mem_ids, int32]
+	flags		flags[cxl_command_info_flags, int32]
+	size_in		flags[cxl_command_info_sizes, int32]
+	size_out	flags[cxl_command_info_sizes, int32]
+}
+
+cxl_send_command {
+	id		flags[cxl_mem_ids, int32] (in)
+	flags		int32 (in)
+	raw		cxl_send_command_raw_union (in)
+	retval		int32 (out)
+	in		cxl_send_command_payload (in)
+	out		cxl_send_command_payload (inout)
+}
+
+cxl_send_command_raw_union [
+	raw		cxl_send_command_raw
+	rsvd		const[0, int32]
+]
+
+cxl_send_command_raw {
+	opcode		flags[cxl_mbox_opcodes, int16]
+	rsvd		const[0, int16]
+}
+
+cxl_send_command_payload {
+	size		bytesize[payload, int32]
+	rsvd		const[0, int32]
+	payload		int64
+}
+
+define CXL_MEM_CMD_FLAG_ENABLED   1 << 0
+define CXL_MEM_CMD_FLAG_EXCLUSIVE 1 << 1
+
+cxl_command_info_flags = CXL_MEM_CMD_FLAG_ENABLED, CXL_MEM_CMD_FLAG_EXCLUSIVE
+cxl_command_info_sizes = -1, 0
+
+cxl_mem_ids = CXL_MEM_COMMAND_ID_RAW, CXL_MEM_COMMAND_ID_GET_SUPPORTED_LOGS, CXL_MEM_COMMAND_ID_GET_FW_INFO, CXL_MEM_COMMAND_ID_GET_PARTITION_INFO, CXL_MEM_COMMAND_ID_GET_LSA, CXL_MEM_COMMAND_ID_GET_HEALTH_INFO, CXL_MEM_COMMAND_ID_GET_LOG, CXL_MEM_COMMAND_ID_SET_PARTITION_INFO, CXL_MEM_COMMAND_ID_SET_LSA, CXL_MEM_COMMAND_ID_GET_ALERT_CONFIG, CXL_MEM_COMMAND_ID_SET_ALERT_CONFIG, CXL_MEM_COMMAND_ID_GET_SHUTDOWN_STATE, CXL_MEM_COMMAND_ID_SET_SHUTDOWN_STATE, CXL_MEM_COMMAND_ID_GET_POISON, CXL_MEM_COMMAND_ID_INJECT_POISON, CXL_MEM_COMMAND_ID_CLEAR_POISON, CXL_MEM_COMMAND_ID_GET_SCAN_MEDIA_CAPS, CXL_MEM_COMMAND_ID_SCAN_MEDIA, CXL_MEM_COMMAND_ID_GET_SCAN_MEDIA
+
+# Refer to CXL 2.0 (or above) Spec.
+define	CXL_MBOX_OP_INVALID		 0x0000
+define	CXL_MBOX_OP_RAW			 CXL_MBOX_OP_INVALID
+define	CXL_MBOX_OP_GET_EVENT_RECORD	 0x0100
+define	CXL_MBOX_OP_CLEAR_EVENT_RECORD	 0x0101
+define	CXL_MBOX_OP_GET_EVT_INT_POLICY	 0x0102
+define	CXL_MBOX_OP_SET_EVT_INT_POLICY	 0x0103
+define	CXL_MBOX_OP_GET_FW_INFO		 0x0200
+define	CXL_MBOX_OP_ACTIVATE_FW		 0x0202
+define	CXL_MBOX_OP_SET_TIMESTAMP	 0x0301
+define	CXL_MBOX_OP_GET_SUPPORTED_LOGS	 0x0400
+define	CXL_MBOX_OP_GET_LOG		 0x0401
+define	CXL_MBOX_OP_IDENTIFY		 0x4000
+define	CXL_MBOX_OP_GET_PARTITION_INFO	 0x4100
+define	CXL_MBOX_OP_SET_PARTITION_INFO	 0x4101
+define	CXL_MBOX_OP_GET_LSA		 0x4102
+define	CXL_MBOX_OP_SET_LSA		 0x4103
+define	CXL_MBOX_OP_GET_HEALTH_INFO	 0x4200
+define	CXL_MBOX_OP_GET_ALERT_CONFIG	 0x4201
+define	CXL_MBOX_OP_SET_ALERT_CONFIG	 0x4202
+define	CXL_MBOX_OP_GET_SHUTDOWN_STATE	 0x4203
+define	CXL_MBOX_OP_SET_SHUTDOWN_STATE	 0x4204
+define	CXL_MBOX_OP_GET_POISON		 0x4300
+define	CXL_MBOX_OP_INJECT_POISON	 0x4301
+define	CXL_MBOX_OP_CLEAR_POISON	 0x4302
+define	CXL_MBOX_OP_GET_SCAN_MEDIA_CAPS	 0x4303
+define	CXL_MBOX_OP_SCAN_MEDIA		 0x4304
+define	CXL_MBOX_OP_GET_SCAN_MEDIA	 0x4305
+define	CXL_MBOX_OP_GET_SECURITY_STATE	 0x4500
+define	CXL_MBOX_OP_SET_PASSPHRASE	 0x4501
+define	CXL_MBOX_OP_DISABLE_PASSPHRASE	 0x4502
+define	CXL_MBOX_OP_UNLOCK		 0x4503
+define	CXL_MBOX_OP_FREEZE_SECURITY	 0x4504
+define	CXL_MBOX_OP_PASSPHRASE_SECURE_ERASE 0x4505
+
+cxl_mbox_opcodes = CXL_MBOX_OP_INVALID, CXL_MBOX_OP_RAW, CXL_MBOX_OP_GET_EVENT_RECORD, CXL_MBOX_OP_CLEAR_EVENT_RECORD, CXL_MBOX_OP_GET_EVT_INT_POLICY, CXL_MBOX_OP_SET_EVT_INT_POLICY, CXL_MBOX_OP_GET_FW_INFO, CXL_MBOX_OP_ACTIVATE_FW, CXL_MBOX_OP_SET_TIMESTAMP, CXL_MBOX_OP_GET_SUPPORTED_LOGS, CXL_MBOX_OP_GET_LOG, CXL_MBOX_OP_IDENTIFY, CXL_MBOX_OP_GET_PARTITION_INFO, CXL_MBOX_OP_SET_PARTITION_INFO, CXL_MBOX_OP_GET_LSA, CXL_MBOX_OP_SET_LSA, CXL_MBOX_OP_GET_HEALTH_INFO, CXL_MBOX_OP_GET_ALERT_CONFIG, CXL_MBOX_OP_SET_ALERT_CONFIG, CXL_MBOX_OP_GET_SHUTDOWN_STATE, CXL_MBOX_OP_SET_SHUTDOWN_STATE, CXL_MBOX_OP_GET_POISON, CXL_MBOX_OP_INJECT_POISON, CXL_MBOX_OP_CLEAR_POISON, CXL_MBOX_OP_GET_SCAN_MEDIA_CAPS, CXL_MBOX_OP_SCAN_MEDIA, CXL_MBOX_OP_GET_SCAN_MEDIA, CXL_MBOX_OP_GET_SECURITY_STATE, CXL_MBOX_OP_SET_PASSPHRASE, CXL_MBOX_OP_DISABLE_PASSPHRASE, CXL_MBOX_OP_UNLOCK, CXL_MBOX_OP_FREEZE_SECURITY, CXL_MBOX_OP_PASSPHRASE_SECURE_ERASE

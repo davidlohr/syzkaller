@@ -1,13 +1,82 @@
 # Copyright 2023 syzkaller project authors. All rights reserved.
 # Use of this source code is governed by Apache 2 LICENSE that can be found in the LICENSE file.
 
+include <linux/uuid.h>
 include <linux/ioctl.h>
+include <uapi/linux/fcntl.h>
 include <uapi/linux/cxl_mem.h>
+
+# TODO:
+#      add /sys/bus/pci/drivers/cxl_pci/[bind|unbind] to execersise device hotplug paths
+#      add the rest of the cxl ABI files
+
+# See https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-bus-cxl for ABI details
+resource fd_cxl_sysfs_flush[fd]
+resource fd_cxl_sysfs_mem_firmware_version[fd]
+resource fd_cxl_sysfs_mem_trigger_poison_list[fd]
+resource fd_cxl_sysfs_decoder_mode[fd]
+resource fd_cxl_sysfs_decoder_create_region[fd]
+resource fd_cxl_sysfs_decoder_delete_region[fd]
+resource fd_cxl_sysfs_region_uuid[fd]
+resource fd_cxl_sysfs_region_ig[fd]
+resource fd_cxl_sysfs_region_iw[fd]
+resource fd_cxl_sysfs_region_size[fd]
+resource fd_cxl_sysfs_region_commit[fd]
 
 resource fd_cxlmem[fd]
 
-syz_open_dev$cxlmem(dev ptr[in, string["/dev/cxl/mem#"]], id intptr, flags flags[open_flags]) fd_cxlmem
+openat$cxl_flush(fd const[AT_FDCWD], file ptr[in, string["/sys/bus/cxl/flush"]], flags const[O_WRONLY], mode const[0]) fd_cxl_sysfs_flush
+write$cxl_flush(fd fd_cxl_sysfs_flush, buf ptr[in, string[cxl_sysfs_yesno]], count bytesize[buf])
 
+# memdevs
+openat$cxl_mem_firmware_version(fd const[AT_FDCWD], file ptr[in, string["/sys/bus/cxl/devices/mem#/firmware_version"]], flags const[O_RDONLY], mode const[0]) fd_cxl_sysfs_mem_firmware_version
+read$cxl_mem_firmware_version(fd fd_cxl_sysfs_mem_firmware_version, buf ptr[out, int64], count bytesize[buf])
+
+openat$cxl_mem_trigger_poison_list(fd const[AT_FDCWD], file ptr[in, string["/sys/bus/cxl/devices/mem#.#/trigger_poison_list"]], flags const[O_WRONLY], mode const[0]) fd_cxl_sysfs_mem_trigger_poison_list
+write$cxl_mem_trigger_poison_list(fd fd_cxl_sysfs_mem_trigger_poison_list, buf ptr[in, string[cxl_sysfs_yesno]], count bytesize[buf])
+
+# decoders
+openat$cxl_decoder_mode(fd const[AT_FDCWD], file ptr[in, string["/sys/bus/cxl/devices/decoder#.#/mode"]], flags const[O_RDWR], mode const[0]) fd_cxl_sysfs_decoder_mode
+read$cxl_decoder_mode(fd fd_cxl_sysfs_decoder_mode, buf ptr[out, string[cxl_sysfs_decoder_modes_output]], count bytesize[buf])
+write$cxl_decoder_mode(fd fd_cxl_sysfs_decoder_mode, buf ptr[in, string[cxl_sysfs_decoder_modes_input]], count bytesize[buf])
+cxl_sysfs_decoder_modes_input = "ram", "pmem"
+cxl_sysfs_decoder_modes_output = "mixed", "none", "ram", "pmem"
+
+openat$cxl_decoder_create_region(fd const[AT_FDCWD], file ptr[in, string[cxl_sysfs_decoder_create_region_files]], flags const[O_RDWR], mode const[0]) fd_cxl_sysfs_decoder_create_region
+read$cxl_decoder_create_region(fd fd_cxl_sysfs_decoder_create_region, buf ptr[out, string["region#"]], count bytesize[buf])
+write$cxl_decoder_create_region(fd fd_cxl_sysfs_decoder_create_region, buf ptr[in, string["region#"]], count bytesize[buf])
+cxl_sysfs_decoder_create_region_files = "/sys/bus/cxl/devices/decoder#.#/create_ram_region", "/sys/bus/cxl/devices/decoder#.#/create_pmem_region"
+
+openat$cxl_decoder_delete_region(fd const[AT_FDCWD], file ptr[in, string["/sys/bus/cxl/devices/decoder#.#/delete_region"]], flags const[O_WRONLY], mode const[0]) fd_cxl_sysfs_decoder_delete_region
+write$cxl_decoder_delete_region(fd fd_cxl_sysfs_decoder_delete_region, buf ptr[in, string["region#"]], count bytesize[buf])
+
+# regions
+openat$cxl_region_uuid(fd const[AT_FDCWD], file ptr[in, string["/sys/bus/cxl/devices/region#/uuid"]], flags const[O_RDWR], mode const[0]) fd_cxl_sysfs_region_uuid
+read$cxl_sysfs_region_uuid(fd fd_cxl_sysfs_region_uuid, buf ptr[out, uuid_t], count bytesize[buf])
+write$cxl_sysfs_region_uuid(fd fd_cxl_sysfs_region_uuid, buf ptr[in, uuid_t], count bytesize[buf])
+
+openat$cxl_region_ig(fd const[AT_FDCWD], file ptr[in, string["/sys/bus/cxl/devices/region#/interleave_granularity"]], flags const[O_RDWR], mode const[0]) fd_cxl_sysfs_region_ig
+read$cxl_sysfs_region_ig(fd fd_cxl_sysfs_region_ig, buf ptr[out, string[cxl_sysfs_ig]], count bytesize[buf])
+write$cxl_sysfs_region_ig(fd fd_cxl_sysfs_region_ig, buf ptr[in, string[cxl_sysfs_ig]], count bytesize[buf])
+cxl_sysfs_ig = "256"
+
+openat$cxl_region_iw(fd const[AT_FDCWD], file ptr[in, string["/sys/bus/cxl/devices/region#/interleave_ways"]], flags const[O_RDWR], mode const[0]) fd_cxl_sysfs_region_iw
+read$cxl_sysfs_region_iw(fd fd_cxl_sysfs_region_iw, buf ptr[out, string[cxl_sysfs_iw]], count bytesize[buf])
+write$cxl_sysfs_region_iw(fd fd_cxl_sysfs_region_iw, buf ptr[in, string[cxl_sysfs_iw]], count bytesize[buf])
+cxl_sysfs_iw = "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"
+
+openat$cxl_region_size(fd const[AT_FDCWD], file ptr[in, string["/sys/bus/cxl/devices/region#/size"]], flags const[O_RDWR], mode const[0]) fd_cxl_sysfs_region_size
+read$cxl_sysfs_region_size(fd fd_cxl_sysfs_region_size, buf ptr[out, int64], count bytesize[buf])
+write$cxl_sysfs_region_size(fd fd_cxl_sysfs_region_size, buf ptr[in, int64], count bytesize[buf])
+
+openat$cxl_region_commit(fd const[AT_FDCWD], file ptr[in, string["/sys/bus/cxl/devices/region#/commit"]], flags const[O_RDWR], mode const[0]) fd_cxl_sysfs_region_commit
+read$cxl_sysfs_region_commit(fd fd_cxl_sysfs_region_commit, buf ptr[out, string[cxl_sysfs_yesno]], count bytesize[buf])
+write$cxl_sysfs_region_commit(fd fd_cxl_sysfs_region_commit, buf ptr[in, string[cxl_sysfs_yesno]], count bytesize[buf])
+
+cxl_sysfs_yesno = "1", "0"
+
+# ioctl
+syz_open_dev$cxlmem(dev ptr[in, string["/dev/cxl/mem#"]], id intptr, flags flags[open_flags]) fd_cxlmem
 ioctl$CXL_MEM_QUERY_COMMANDS(fd fd_cxlmem, cmd const[CXL_MEM_QUERY_COMMANDS], arg ptr[inout, cxl_mem_query_commands])
 ioctl$CXL_MEM_SEND_COMMAND(fd fd_cxlmem, cmd const[CXL_MEM_SEND_COMMAND], arg ptr[inout, cxl_send_command])
 
